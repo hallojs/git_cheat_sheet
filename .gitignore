@@ -1,0 +1,9 @@
+# macOS dust
+.DS_Store
+
+# latex temp files
+.texpadtmp
+*.aux
+*.fdb_latexmk
+*.fls
+*.log

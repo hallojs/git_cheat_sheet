@@ -1,0 +1,705 @@
+\documentclass[a4paper,8pt,landscape,twocolumn]{scrartcl}
+\setlength{\columnsep}{2cm} % Abstand zwischen den beiden Textspalten
+\setlength{\parindent}{0em} % Einrücken der Absätze verhindern
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[ngerman]{babel}
+\usepackage[left=25mm, right=25mm, top=25mm, bottom=20mm]{geometry} % Seitenränder
+\usepackage{enumitem,xcolor} % Textfarben
+\usepackage[framemethod=tikz]{mdframed} % farbige Textboxen
+\newmdenv[innerlinewidth=0.5pt, roundcorner=4pt, linecolor=orange, innerleftmargin=6pt, innerrightmargin=6pt, innertopmargin=6pt, innerbottommargin=6pt]{orangeBox}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes, arrows}
+\tikzstyle{rEck} = [draw, rectangle, node distance=2.5cm, minimum width=2cm, minimum height=1cm, text centered, text width=2cm]
+\tikzstyle{smallREck} = [draw, rectangle, node distance=1.5cm, minimum width=1cm, minimum height=0.5cm, text centered, text width=1cm]
+\tikzstyle{ellip} = [draw, ellipse, node distance=1cm, minimum width=0.8cm, minimum height=0.8cm, text centered, text width=0.4cm]
+\tikzstyle{arrow} = [thick,->,>=stealth]
+
+\usepackage{listings} % zum dartstellen von Sourcecode
+\lstdefinestyle{Bash}
+{language=bash,
+keywordstyle=\color{orange},
+basicstyle=\ttfamily,
+morekeywords={config, add, commit, init, clone, status, diff, log, blame, checkout, branch, merge, rebase, reset, revert, cherry, pick, remote, fetch, pull, push},
+%morekeywords=[2]{peter@kbpet:},
+%keywordstyle=[2]{\color{red}},
+literate={\$}{{\textcolor{red}{\$}}}1 
+         {:}{{\textcolor{red}{:}}}1
+         {~}{{\textcolor{red}{\textasciitilde}}}1
+         {^}{{\textcolor{red}{\^{}}}}1
+         {"}{{\textcolor{red}{"}}}1
+         {]}{{\textcolor{blue}{]}}}1
+         {[}{{\textcolor{blue}{[}}}1,
+}
+
+\title{git - Eine Zusammenfassung}
+\author{Jonas Sander}
+
+\begin{document}\maketitle
+
+\section{Konfigurieren (Aussehen und Funktion)}
+Die Konfigurationswerte werden an drei verschiedenen Orten gespeichert:
+
+\begin{enumerate}[label=\color{orange}\theenumi]
+\item /etc/gitconfig (Mac: /etc in .private zu finden) enthält Werte, die für jeden Anwender des Systems und alle ihre Projekte gelten.
+\item \textasciitilde/.gitconfig (\textasciitilde entspricht deinem Benutzerordner) enthält Werte, die ausschließlich für dich und deine Projekte gelten.
+\item .git/config im Git Verzeichnis deines Projektes enthält Werte die nur für das jeweilige Projekt gelten.
+\end{enumerate}
+
+\textcolor{orange}{3} hat die höchste und \textcolor{orange}{1} die geringste Priorität. Das heißt wenn Werte in \textcolor{orange}{3} stehen, so werden diese vor den Werten aus \textcolor{orange}{1} und \textcolor{orange}{2} verwendet. Für \textcolor{orange}{1} schreibe \texttt{- -system}, für \textcolor{orange}{2} \texttt{- -global} und für \textcolor{orange}{3} gar nichts an die Stelle \texttt{[Option]}
+
+
+\subsection{Benutzer anlegen}
+Unterdiesem Namen werden die Commits veröffentlicht!
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Option] user.name "Jonas Sander"
+Jonas$ git config [Option] user.email jonas.sander@...
+\end{lstlisting}
+
+
+\subsection{Die Ausgaben einfärben}
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Option] color.diff true
+Jonas$ git config [Option] color.ui true
+Jonas$ git config [Option] color.status true
+\end{lstlisting}
+
+
+\subsection{Zeilenende}
+\texttt{[Zeilenende]} $\rightarrow$ \texttt{input} für Mac/Linux $\rightarrow$ \texttt{true} für Windows
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Option] core.autocrlf [Zeilenende]
+\end{lstlisting}
+
+
+\subsection{Dein Editor}
+\texttt{[Editor]} $\rightarrow$ gewünschter Editor z.B nano
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Option] core.editor [Editor]
+\end{lstlisting}
+
+
+\subsection{Dein Diff Programm}
+\texttt{[DiffProg]} $\rightarrow$ gewünschtes Diff Programm z.B vimdiff
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Option] merge.tool [DiffProg]
+\end{lstlisting}
+
+
+\subsection{Deine Einstellungen anzeigen}
+Zeigt alle Einstellungen, die Git an dieser Stelle (z.b in einem \texttt{Projekt}) bekannt sind. Manche Variablen werden eventuell mehrfach aufgelistet, da Git sie an mehreren Orten findet. In diesem Fall verwendet Git den zuletzt aufgelisteten Wert.
+\begin{lstlisting}[style=bash]
+Projekt Jonas$ git config --list
+\end{lstlisting}
+
+Zeigt den Wert für eine bstimme Variable $\rightarrow$ \texttt{[Variable]}
+\begin{lstlisting}[style=bash]
+Jonas$ git config [Variable]
+\end{lstlisting}
+
+\subsection{SSH-Keys}
+\begin{enumerate}[label=\color{orange}\theenumi]
+\item Wo liegen die Keys: /Users/JonasSander/.ssh (Versteckte Ordner im Finder anzeigen: cmd+shift+.)
+\end{enumerate}
+
+\section{Git Aufbau - Wo landen die Commits?}
+\begin{tikzpicture}{node distance=1.5cm}
+\node (stash) [rEck] {Stash};
+\node (wcopy) [rEck, right of=stash] {Working Copy (-Tree)};
+\node (index) [rEck, right of=wcopy] {Staging Area (Index)};
+\node (lRepo) [rEck, right of=index] {Lokales Respository};
+\node (rRepo) [rEck, right of=lRepo] {Remote Respository};
+\node (nothing) [ellip, above of= rRepo, node distance=1.5cm, color=white] {};
+
+\draw [arrow, bend angle=45, bend right] (wcopy) to node[anchor=north]{\color{orange}\texttt{add}} (index);
+\draw [arrow, bend angle=45, bend right] (index) to node[anchor=north]{\color{orange}\texttt{commit}} (lRepo);
+\draw [arrow, bend angle=45, bend right] (lRepo) to node[anchor=north]{\color{orange}\texttt{push}} (rRepo);
+\draw [arrow, bend angle=45, bend left] (wcopy) to node[anchor=north]{\color{orange}\texttt{stash}} (stash);
+
+\draw [arrow, bend angle=70, bend left] (lRepo) to node[anchor=north]{\color{red}\texttt{reset - -mixed}} (wcopy);
+\draw [arrow, bend angle=45, bend right] (lRepo) to node[anchor=south]{\color{red}\texttt{reset - -soft}} (index);
+\draw [arrow] (rRepo) to node[anchor=east]{\color{red}\texttt{reset - -hard}} (nothing);
+\end{tikzpicture}
+
+
+\section{Mit Git arbeiten}
+\subsection{Repos erstellen}
+\begin{lstlisting}[style=bash]
+$ git clone [Adresse]
+$ git init
+\end{lstlisting}
+
+
+\subsection{Lokale Änderungen}
+\begin{orangeBox}
+Veränderungen im Working Copy
+\begin{lstlisting}[style=bash]
+$ git status
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Änderungen seit dem letzten Commit; \texttt{[Option]} $\rightarrow$ ohne, die noch nicht in der Stage Area sind $\rightarrow$ \texttt{- - staged}, die bereits in der Stage Area sind $\rightarrow$ CommitID-1 CommitID-2, Vergleich zwischen zwei Commits
+\begin{lstlisting}[style=bash]
+$ git diff [Option]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Lokale Änderungen zur Staging Area hinzufügen. \texttt{[Dateiname]} $\rightarrow$ . fügt alle Dateien aus der Working Copy in die Satging Area hinzu.
+\begin{lstlisting}[style=bash]
+$ git add [Dateiname]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+\texttt{[Option]} $\rightarrow$ Zur Staging Area hinzugefügte Dateien commiten. $\rightarrow$ \texttt{-a} Dateien aus Working Copy direkt commiten (ohne \texttt{add}-Befehl). $\rightarrow$ \texttt{- - amend} letzten/neusten commit ändern (Breits veröffentlichte Commits nicht änderbar!)
+\begin{lstlisting}[style=bash]
+$ git commit [Option]
+\end{lstlisting}
+\end{orangeBox}
+
+
+\subsection{Die Commit Historie}
+\begin{orangeBox}
+\texttt{[Option]} $\rightarrow$ ohne, alle Commits chronologisch anzeigen. $\rightarrow$ \texttt{-p} zeigt die Änderungen in einem Commit, ergänzt man zudem noch einen \texttt{<file>}, so werden alle Änderungen in diesem File über alle Commits ausgegeben. $\rightarrow$ \texttt{-x} zeigt die letzten x Commits an.
+\begin{lstlisting}[style=bash]
+$ git log [Option]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Wer veränderte was und wann in \texttt{<file>}.
+\begin{lstlisting}[style=bash]
+$ git blame [file]
+\end{lstlisting}
+\end{orangeBox}
+
+
+\subsection{Branches in Git}
+\textbf{Branches} sind einfach gesagt Verweise auf bestimmte Commits.\\
+Der \textbf{HEAD} ist ein Alias für den Commit der gerade ausgecheckt ist. HEAD zeigt immer auf den neusten Commit. Normalerweise zeigt HEAD auf einen Branch. Wir nun ein Commit hinzugefügt, so wird der Branch auf diesen Commit angehoben (da der HEAD ja gerade auf diesen zeigt).
+\begin{orangeBox}
+\texttt{[Option]} $\rightarrow$ \texttt{-av} alle Branches auflisten. $\rightarrow$ \texttt{<Branch-Name>} erstellen eines neuen lokalen Branch (auf aktuellem HEAD) $\rightarrow$ \texttt{-d <Branch-Name>} lokalen Branch löschen.
+\begin{lstlisting}[style=bash]
+$ git branch [Option]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Aktuellen HEAD-Branch wechseln
+\begin{lstlisting}[style=bash]
+$ git checkout [Branch-Name]
+\end{lstlisting}
+\end{orangeBox}
+
+
+\subsection{Zusammenführen von Commits}
+\begin{orangeBox}
+Merge von \texttt{[Branch-Name]} in den aktuellen HEAD.
+\begin{lstlisting}[style=bash]
+$ git merge [Branch-Name]
+\end{lstlisting}
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git merge bugFix
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, yshift=0.5cm, xshift=1cm] {c2};
+\node (c) [ellip, below of=b] {c3};
+\node (d) [ellip, right of=c, xshift=1cm, color=orange] {c4};
+\node (BugFix) [smallREck, right of=b] {bugFix};
+\node (oldMaster) [smallREck, below of=c, node distance=1cm, color=gray] {master [HEAD]};
+\node (Master) [smallREck, below of=d, node distance=1cm, color=orange] {master [HEAD]};
+
+
+\draw [arrow, color=orange] (d) -- (b);
+\draw [arrow, color=orange] (d) -- (c);
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (a);
+\draw [arrow] (BugFix) -- (b);
+\draw [arrow, color=gray] (oldMaster) -- (c);
+\draw [arrow, color=orange] (Master) -- (d);
+\end{tikzpicture}
+\end{orangeBox}
+
+\begin{orangeBox}
+Rebase von \texttt{[Branch-Name]} auf HEAD.
+\begin{lstlisting}[style=bash]
+$ git rebase [Branch-Name]
+\end{lstlisting}
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git rebase master
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, yshift=0.5cm, xshift=1cm] {c3};
+\node (c) [ellip, below of=b] {c2};
+\node (d) [ellip, right of=c, xshift=1cm, color=orange] {c3'};
+\node (oldBugFix) [smallREck, right of=b, color=gray] {bugFix [HEAD]};
+\node (Master) [smallREck, below of=c, node distance=1cm] {master};
+\node (BugFix) [smallREck, below of=d, node distance=1cm, color=orange] {bugFix [HEAD]};
+
+\draw [arrow, color=orange] (d) -- (c);
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (a);
+\draw [arrow, color=gray] (oldBugFix) -- (b);
+\draw [arrow] (Master) -- (c);
+\draw [arrow, color=orange] (BugFix) -- (d);
+\end{tikzpicture}
+\\
+Was in bugFix gemacht wurde, haben wir jetzt oben auf master drauf gepackt und haben eine lienare Abfolge von Commits erhalten. c3 existiert immer noch. c3' ist prinzipiell bloß eine Kopie von c3 die zusätzlich c2 enthält.
+\end{orangeBox}
+
+
+\subsection{Navigation durch Git}
+\begin{orangeBox}
+\textbf{"Detached HEAD state"'} bezeichnet den Zusatand, in dem ein bestimmter Commit anstelle eines Branches ausgecheckt ist. \textbf{Achtung:} In diesem Zustand committete Änderungen werden von keinem Branch referenziert und können so leicht verloren gehen, wenn man sich nicht gerade den Hash des Commits merkt. \textbf{Anwendungsfall:} Diese Methode bietet sich an, falls man in der Zeit zurück gehen möchte um eine frühere Version seines Projektes zu testen.\\
+\textit{Um sich aber nicht in die Schwierigkeiten dieser Methode zu manövrieren, bietet es sich an temporär einen neuen Branch anzulegen.}
+\begin{lstlisting}[style=bash]
+$ git checkout [Commit-Hash]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Nur mit Hashwerten durch die Git-Historie zu navigieren kann sehr mühselig sein. Mit \textbf{relativen Referenzen} kann man bei einprägsamen Branches oder dem HEAD beginnen. \texttt{\^{}} checkt den Vorgänger-Commit aus. \texttt{\^{}\^{}} den Vorvorgänger usw. \texttt{ \textasciitilde x} checkt den x-ten Vorgänger aus.
+\begin{lstlisting}[style=bash]
+$ git checkout master^
+$ git checkout master~[Anzahl]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+Das \textbf{Verschieben von Branches} auf einen bestimmten Commit, ohne vorheriges auschecken des betreffenden Branches, gelingt mit folgendem Befehl:
+\begin{lstlisting}[style=bash]
+$ git branch -f [Branch-Name] [Ziel-Commit]
+\end{lstlisting}
+Beispiel:\\
+Bewegt den Branch master auf den Commit drei Vorgänger vor HEAD.
+\begin{lstlisting}[style=bash]
+$ git branch -f master HEAD~3
+\end{lstlisting}
+\end{orangeBox}
+
+\subsection{In Git etwas rückgängig machen}
+\begin{orangeBox}
+\texttt{git reset} nimmt \textbf{lokale Änderung} zurück indem es eine Branch-Referenz auf einen anderen Commit setzt.\\
+\texttt{[Option]} $\rightarrow$ ohne oder \texttt{- -mixed} nimmt Commit zurück in die Working-Copy. $\rightarrow$ \texttt{- -soft} nimmt Commit zurück in die Staging Area. Nützlich wenn man etwas im Commit vergisst. $\rightarrow$ \texttt{- -hard} verwirft alle Änderungen seit einem Commit.
+\begin{lstlisting}[style=bash]
+$ git reset [Option] [CommitID]
+\end{lstlisting}
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git reset --hard HEAD~1
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (c) [ellip, right of=b, xshift=1cm, color=gray] {c3};
+\node (oldMaster) [smallREck, below of=c, node distance=1cm, color=gray] {master [HEAD]};
+\node (master) [smallREck, below of=b, node distance=1cm, color=orange] {master [HEAD]};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow, color=gray] (c) -- (b);
+\draw [arrow, color=gray] (oldMaster) -- (c);
+\draw [arrow, color=orange] (master) -- (b);
+\end{tikzpicture}
+\end{orangeBox}
+
+\begin{orangeBox}
+Während sich \texttt{git reset} gut im lokalen Kontext verwenden lässt, ist es für Änderung von Commits die bereist im Remote Respository liegen ungeeignet. Um \textbf{Änderungen auf dem Remote Respository} durchzuführen und somit mit anderen zu teilen, verwendet man folgenden Befehl:
+\begin{lstlisting}[style=bash]
+$ git revert [CommitID]
+\end{lstlisting}
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git revert HEAD
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (c) [ellip, right of=b, xshift=1cm, color=orange] {c2'};
+\node (oldMaster) [smallREck, below of=b, node distance=1cm, color=gray] {master [HEAD]};
+\node (master) [smallREck, below of=c, node distance=1cm, color=orange] {master [HEAD]};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow, color=orange] (c) -- (b);
+\draw [arrow, color= gray] (oldMaster) -- (b);
+\draw [arrow, color=orange] (master) -- (c);
+\end{tikzpicture}
+\\
+Mit c2' werden die Änderungen aus c2 rückgängig gemacht.
+\end{orangeBox}
+
+
+\subsection{Inhalte verschieben}
+\begin{orangeBox}
+Eine Folge von Commits unter den HEAD kopieren.
+\begin{lstlisting}[style=bash]
+$ git cherry-pick [CommitID-1] [CommitID-2] [CommitID-...]
+\end{lstlisting}
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git cherry-pick c2 c4
+\end{lstlisting}
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, yshift=0.5cm, xshift=1cm] {c5};
+\node (c) [ellip, right of=b, xshift=1cm, color=orange] {c2'};
+\node (d) [ellip, right of=c, xshift=1cm, color=orange] {c4'};
+\node (e) [ellip, below of=b] {c2};
+\node (f) [ellip, below of=c] {c3};
+\node (g) [ellip, below of=d] {c4};
+\node (oldMaster) [smallREck, above of=b, node distance=1cm, color=gray] {master [HEAD]};
+\node (side) [smallREck, below of=g, node distance=1cm] {side};
+\node (master) [smallREck, above of=d, node distance=1cm, color=orange] {master [HEAD]};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (e) -- (a);
+\draw [arrow, color=orange] (c) -- (b);
+\draw [arrow, color=orange] (d) -- (c);
+\draw [arrow] (f) -- (e);
+\draw [arrow] (g) -- (f);
+\draw [arrow] (side) -- (g);
+\draw [arrow, color=gray] (oldMaster) -- (b);
+\draw [arrow, color=orange] (master) -- (d);
+\end{tikzpicture}
+\end{orangeBox}
+
+\subsection{Remote Respositories}
+\begin{orangeBox}
+Ein remote Respository clonen.
+\begin{lstlisting}[style=bash]
+$ git clone [URL]
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip, color=orange] {c1};
+\node (b) [ellip, right of=a, xshift=1cm, color=orange] {c2};
+\node (master) [smallREck, below of=b, node distance=1cm, color=blue] {master [HEAD]};
+\node (origin/master) [smallREck, above of=b, node distance=1cm, color=orange] {origin/ master};
+\node (c) [ellip, dashed, right of=b, xshift=3cm] {c1};
+\node (d) [ellip, dashed, right of=c, xshift=1cm] {c2};
+\node (remoteMaster) [smallREck, dashed, above of=d, node distance=1cm] {master};
+
+\draw [arrow, color=orange] (b) -- (a);
+\draw [arrow, color=blue] (master) -- (b);
+\draw [arrow, color=orange] (origin/master) -- (b);
+\draw [arrow, dashed] (d) -- (c);
+\draw [arrow, dashed] (remoteMaster) -- (d);
+\end{tikzpicture}
+\\
+\textcolor{blue}{Der Branch master dient zur Veranschaulichung und wurde nicht geclont.} \textbf{Der Branch origin/master ist ein Remote Branch.} Remote Branches bilden den Zustand des entsprechenden Branches in einem Remote Respository ab (dem Zustand in dem der Branch war, als du zuletzt gefetched hast). Der Remote Branch hilft, den Unterschied zwischen einem lokalen Branch und dem entfernten Gegenstück auf dem Server darzustellen.\\
+Remote Branches besitzen die Eigenschaft dein Respository in den "'detached HEAD state"` zu versetzen wenn sie ausgechecked werden. Git tut dies absichtlich, denn so kann man nicht direkt auf Remote Branches arbeiten. Man muss auf Kopien von ihnen Arbeiten und die Änderungen von dort auf den entfernten Server schieben (wonach der Remote Branch dann auch bei einem selbst aktualisiert wird).
+\end{orangeBox}
+
+\begin{orangeBox}
+\textbf{Remote Branch auschecken und committen -  Ein Beispiel:}
+\begin{lstlisting}[style=bash]
+$ git checkout origin/master
+$ git commit
+\end{lstlisting}
+
+\begin{tikzpicture}
+% \node (detachedHead) [rEck, above of=a, node distance=2.1cm, text width=4cm,  color=red] {DETACHED HEAD MODE};
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (e) [ellip, right of=b, xshift=1cm, color=orange] {c3};
+\node (master) [smallREck, below of=b, node distance=1cm] {master};
+\node (origin/master) [smallREck, above of=b, node distance=1cm, text width=2cm] {origin/master \textcolor{gray}{HEAD}};
+\node (head) [smallREck, above of=e, node distance=1cm, color=orange] {HEAD};
+\node (c) [ellip, dashed, right of=b, xshift=3cm] {c1};
+\node (d) [ellip, dashed, right of=c, xshift=1cm] {c2};
+\node (remoteMaster) [smallREck, dashed, above of=d, node distance=1cm] {master};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (master) -- (b);
+\draw [arrow,] (origin/master) -- (b);
+\draw [arrow, dashed] (d) -- (c);
+\draw [arrow, dashed] (remoteMaster) -- (d);
+\draw [arrow, color=orange] (e) -- (b);
+\draw [arrow, color=orange] (head) -- (e);
+\end{tikzpicture}
+\\
+Git wird in den \textcolor{red}{Detached Head Mode} versetzt und aktualisiert nach dem Committen nicht den Brach origin/master. Schließlich soll nicht direkt auf Remote Branches gearbeitet werden (siehe vorheriger Kasten).
+\end{orangeBox}
+
+\begin{orangeBox}
+\texttt{[Option]} $\rightarrow$ \texttt{add <shortname> <URL>} erstes oder weiteres remote Respository anbinden. $\rightarrow$ \texttt{set-url <URL>} Respository-URL updaten. $\rightarrow$ \texttt{-v} alle konfigurierten remote Respositorys listen. $\rightarrow$ \texttt{show <remote>} Infos über ein remote Respository ausgeben.
+\begin{lstlisting}[style=bash]
+$ git remote [Option]
+\end{lstlisting}
+\end{orangeBox}
+
+\begin{orangeBox}
+\texttt{git fetch} \textbf{lädt die Commits herunter die im lokalen Respository fehlen und aktualisiert die Remote Branches} wenn nötig. Der Befehl synchronisiert im Prinzip unsere lokale Abbildung des entfernten Repositorys mit dem wie das entfernte Respository in diesem Moment wirklich aussieht. \texttt{git fetch} ändert aber nichts an deinen lokalen Branches oder deinem Checkout.
+\begin{lstlisting}[style=bash]
+$ git fetch
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (c) [ellip, right of=b, xshift=1cm, color=orange] {c3};
+\node (d) [ellip, right of=c, xshift=1cm, color=orange] {c4};
+\node (master) [smallREck, below of=b, node distance=1cm] {master HEAD};
+\node (oldOrigin/master) [smallREck, above of=b, color=gray, node distance=1cm] {origin/ master};
+\node (origin/master) [smallREck, above of=d, color=orange, node distance=1cm] {origin/ master};
+
+\node (e) [ellip, dashed, below of=a, yshift=-1.5cm] {c1};
+\node (f) [ellip, dashed, right of=e, xshift=1cm] {c2};
+\node (g) [ellip, dashed, right of=f, xshift=1cm] {c3};
+\node (h) [ellip, dashed, right of=g, xshift=1cm] {c4};
+\node (rMaster) [smallREck, dashed, below of=h, node distance=1cm] {master};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow, color=orange] (c) -- (b);
+\draw [arrow, color=orange] (d) -- (c);
+\draw [arrow] (master) -- (b);
+\draw [arrow, color=gray] (oldOrigin/master) -- (b);
+\draw [arrow, color=orange] (origin/master) -- (d);
+
+\draw [arrow, dashed] (f) -- (e);
+\draw [arrow, dashed] (g) -- (f);
+\draw [arrow, dashed] (h) -- (g);
+\draw [arrow, dashed] (rMaster) -- (h);
+\end{tikzpicture}
+\\
+Der Befehl fetch mit folgende Optionen funktioniert ähnlich wie der Befehl push mit den selben Optionen. Nur das bei push Dateien hoch- und bei fetch heruntergeladen werden.
+\begin{lstlisting}[style=bash]
+$ git fetch [Remote] [Ort]
+$ git fetch [Remote] [Quelle:Ziel]
+\end{lstlisting}
+\textit{Crazy: Lässt man das Ziel weg, wir ein neuer lokaler Branch erstellt :D}
+\end{orangeBox}
+
+\begin{orangeBox}
+Mit \texttt{git fetch} können wir Daten vom entfernten Respository holen. Anschließend lassen sich diese Daten mit \texttt{git cherry-pick origin/...}, \texttt{git rebase origin/...} oder \texttt{git merge origin/...} in das lokale Respository integrieren. Herunterladen und Integrieren auf einmal funktioniert mit \texttt{git pull}. Folgende Befehle tun also das gleiche:
+\begin{lstlisting}[style=bash]
+$ git fetch
+$ git merge origin/master
+\end{lstlisting}
+
+\begin{lstlisting}[style=bash]
+$ git pull
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (d) [ellip, right of=b, xshift=1cm, yshift=0.5cm, color=orange] {c4};
+\node (c) [ellip, below of=d] {c3};
+\node (e) [ellip, right of=c, xshift=1cm, color=orange] {c5};
+\node (oldOrigin/master) [smallREck, above of=b, color=gray, node distance=1cm] {origin/ master};
+\node (oldMaster) [smallREck, below of=c, node distance=1cm, color=gray] {master HEAD};
+\node (origin/master) [smallREck, above of=d, color=orange, node distance=1cm] {origin/ master};
+\node (master) [smallREck, below of=e, node distance=1cm, color=orange] {master HEAD};
+
+\node (f) [ellip, dashed, below of=a, yshift=-1.8cm] {c1};
+\node (g) [ellip, dashed, right of=f, xshift=1cm] {c2};
+\node (h) [ellip, dashed, right of=g, xshift=1cm] {c4};
+\node (rMaster) [smallREck, dashed, below of=h, node distance=1cm] {master};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (b);
+\draw [arrow, color=orange] (d) -- (b);
+\draw [arrow, color=orange] (e) -- (c);
+\draw [arrow, color=orange] (e) -- (d);
+\draw [arrow, color=gray] (oldOrigin/master) -- (b);
+\draw [arrow, color=gray] (oldMaster) -- (c);
+\draw [arrow, color=orange] (origin/master) -- (d);
+\draw [arrow, color=orange] (master) -- (e);
+
+\draw [arrow, dashed] (g) -- (f);
+\draw [arrow, dashed] (h) -- (g);
+\draw [arrow, dashed] (rMaster) -- (h);
+\end{tikzpicture}
+\\
+Der Befehl pull mit folgende Optionen funktioniert ähnlich wie der Befehl push mit den selben Optionen. Nur das bei push Dateien hoch- und bei pull heruntergeladen und gemerget werden.
+\begin{lstlisting}[style=bash]
+$ git push [Remote] [Ort]
+$ git push [Remote] [Quelle:Ziel]
+\end{lstlisting}
+\textit{Existiert das Ziel nicht, so wird ein neuer Branch erstellt.}
+\end{orangeBox}
+
+\begin{orangeBox}
+\textbf{Dateien zum Remote Respository hinzufuegen:}
+\begin{lstlisting}[style=bash]
+$ git push
+\end{lstlisting}
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (c) [ellip, right of=b, xshift=1cm] {c3};
+\node (oldOrigin/master) [smallREck, above of=b, color=gray, node distance=1cm] {origin/ master};
+\node (origin/master) [smallREck, above of=c, color=orange, node distance=1cm] {origin/ master};
+\node (master) [smallREck, below of=c, node distance=1cm] {master HEAD};
+
+\node (d) [ellip, dashed, right of=c, xshift=1cm] {c1};
+\node (e) [ellip, dashed, right of=d, xshift=1cm] {c2};
+\node (f) [ellip, dashed, right of=e, xshift=1cm, color=orange] {c3};
+\node (oldRMaster) [smallREck, dashed, above of=e, node distance=1cm, color=gray] {master};
+\node (rMaster) [smallREck, dashed, above of=f, node distance=1cm, color=orange] {master};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (b);
+\draw [arrow, color=gray] (oldOrigin/master) -- (b);
+\draw [arrow, color=orange] (origin/master) -- (c);
+\draw [arrow] (master) -- (c);
+
+\draw [arrow, dashed] (e) -- (d);
+\draw [arrow, dashed, color=orange] (f) -- (e);
+\draw [arrow, dashed, color=gray] (oldRMaster) -- (e);
+\draw [arrow, dashed, color=orange] (rMaster) -- (f);
+\end{tikzpicture}
+Das Remote Respository hat den Commit c3 bekommen. Der Branch master im Remote Respository ist aktualisiert worden. Unsere eigene Abbildung des master Branches vom Remote Respository names origin/master ist ebenfalls aktualisiert worden.\\
+Zeigt der HEAD nicht auf einen Branch, der einen Remote Branch trackt, so schlägt der Befehl fehl. Soll ein Branch der nicht ausgecheckt ist gepusht werden, so verwende push mit folgenden Optionen. Folgender Befehl würde den loakelen Branch master auf den Branch master im Remote Respository pushen ohne das master im lokalen Respository ausgecheckt sein muss \textit{(Vorauss.: Der lokale master Branch trackt den Remote Branch origin/master)}.
+\begin{lstlisting}[style=bash]
+$ git push origin master
+\end{lstlisting}
+Und nochmal in allgemeiner Notation:
+\begin{lstlisting}[style=bash]
+$ git push [Remote] [Ort]
+\end{lstlisting}
+\textbf{Und was wenn die Quelle eine andere sein soll als das Ziel?} Dann verwenden wir \textbf{Refspec (Referenzspezifikation)}:
+\begin{lstlisting}[style=bash]
+$ git push [Remote] [Quelle:Ziel]
+\end{lstlisting}
+\textit{Lässt man die Quelle weg, so wird der entfernte Branch (und sein Remote Branch) gelöscht.}\\
+Beispiel:
+\begin{lstlisting}[style=bash]
+$ git push origin foo^:master
+\end{lstlisting}
+Git löst foo\^{} zu einem Commit auf, integriert alle einschließlich diesem, die noch nicht im entfernten master Branch waren, in den entfernten master Branch. \textit{Praktisch: Wenn der Ziel Branch noch nicht existiert, so wird er erstellt!}
+\end{orangeBox}
+
+\begin{orangeBox}
+\textbf{Dateien zum Remote Respository bei abweichenden Historien hinzufügen:} Unterscheidet sich die Historie deines lokalen Repositorys von der des Remote Respositorys, so erlaubt Git keine einfach Ausführung von \texttt{git push}. \textbf{Zuvor müssen die Änderungen vom Remote Respository heruntergeladen und in dein lokales Respository integriert werden.} Dann kann \texttt{git push} ausgeführt werden.\\
+\textbf{Wie wird das aufgelöst?}\\
+\begin{enumerate}
+\item \textbf{Commits per Rebase verschieben:} Folgende Befehlssätze führen zu gleichem Ergebnis.
+\begin{lstlisting}[style=bash]
+$ git fetch
+$ git rebase origin/master
+$ git push
+\end{lstlisting}
+\begin{lstlisting}[style=bash]
+$ git pull --rebase
+$ git push
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (d) [ellip, right of=b, xshift=1cm, yshift=0.5cm, color=orange] {c3};
+\node (c) [ellip, below of=d] {c4};
+\node (e) [ellip, right of=d, xshift=1cm, color=orange] {c4'};
+\node (oldOrigin/master) [smallREck, above of=b, color=gray, node distance=1cm] {origin/ master};
+\node (origin/master) [smallREck, above of=e, color=orange, node distance=1cm] {origin/ master};
+\node (oldMaster) [smallREck, below of=c, node distance=1cm, color=gray] {master HEAD};
+\node (master) [smallREck, below of=e, node distance=1cm, color=orange] {master HEAD};
+
+\node (f) [ellip, dashed, below of=a, yshift=-1.8cm] {c1};
+\node (g) [ellip, dashed, right of=f, xshift=1cm] {c2};
+\node (h) [ellip, dashed, right of=g, xshift=1cm] {c3};
+\node (i) [ellip, dashed, right of=h, xshift=1cm, color=orange] {c4'};
+\node (rOldMaster) [smallREck, below of=h, node distance=1cm, color=gray, dashed] {master};
+\node (rMaster) [smallREck, below of=i, node distance=1cm, color=orange, dashed] {master};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (b);
+\draw [arrow, color=orange] (d) -- (b);
+\draw [arrow, color=orange] (e) -- (d);
+\draw [arrow, color=gray] (oldOrigin/master) -- (b);
+\draw [arrow, color=orange] (origin/master) -- (e);
+\draw [arrow, color=gray] (oldMaster) -- (c);
+\draw [arrow, color=orange] (master) -- (e);
+
+\draw [arrow, dashed] (g) -- (f);
+\draw [arrow, dashed] (h) -- (g);
+\draw [arrow, dashed, color=orange] (i) -- (h);
+\draw [arrow, dashed, color=gray] (rOldMaster) -- (h);
+\draw [arrow, dashed, color=orange] (rMaster) -- (i);
+\end{tikzpicture}
+
+\item \textbf{Commits per Merge verschieben:} Folgende Befehlssätze führen zu gleichem Ergebnis.
+\begin{lstlisting}[style=bash]
+$ git pull
+$ git merge origin/master
+$ git push
+\end{lstlisting}
+\begin{lstlisting}[style=bash]
+$ git pull
+$ git push
+\end{lstlisting}
+
+\begin{tikzpicture}
+\node (a) [ellip] {c1};
+\node (b) [ellip, right of=a, xshift=1cm] {c2};
+\node (d) [ellip, right of=b, xshift=1cm, yshift=0.5cm, color=orange] {c3};
+\node (c) [ellip, below of=d] {c4};
+\node (e) [ellip, right of=d, xshift=1cm, color=orange] {c5};
+\node (oldOrigin/master) [smallREck, above of=b, color=gray, node distance=1cm] {origin/ master};
+\node (origin/master) [smallREck, above of=e, color=orange, node distance=1cm] {origin/ master};
+\node (oldMaster) [smallREck, below of=c, node distance=1cm, color=gray] {master HEAD};
+\node (master) [smallREck, below of=e, node distance=1cm, color=orange] {master HEAD};
+
+\node (f) [ellip, dashed, below of=a, yshift=-3.2cm] {c1};
+\node (g) [ellip, dashed, right of=f, xshift=1cm] {c2};
+\node (h) [ellip, dashed, right of=g, xshift=1cm, yshift=0.5cm] {c3};
+\node (i) [ellip, dashed, below of=h, color=orange] {c4};
+\node (j) [ellip, dashed, right of=h, xshift=1cm, color=orange] {c5};
+\node (rOldMaster) [smallREck, dashed, above of=h, node distance=1cm, color=gray] {master HEAD};
+\node (rMaster) [smallREck, dashed, below of=j, node distance=1cm, color=orange] {master HEAD};
+
+\draw [arrow] (b) -- (a);
+\draw [arrow] (c) -- (b);
+\draw [arrow, color=orange] (d) -- (b);
+\draw [arrow, color=orange] (e) -- (c);
+\draw [arrow, color=orange] (e) -- (d);
+\draw [arrow, color=gray] (oldOrigin/master) -- (b);
+\draw [arrow, color=orange] (origin/master) -- (e);
+\draw [arrow, color=gray] (oldMaster) -- (c);
+\draw [arrow, color=orange] (master) -- (e);
+
+\draw [arrow, dashed] (g) -- (f);
+\draw [arrow, dashed] (h) -- (g);
+\draw [arrow, dashed] (i) -- (g);
+\draw [arrow, dashed, color=orange] (j) -- (h);
+\draw [arrow, dashed, color=orange] (j) -- (i);
+\draw [arrow, color=gray] (rOldMaster) -- (h);
+\draw [arrow, color=orange] (rMaster) -- (j);
+\end{tikzpicture}
+\end{enumerate}
+\end{orangeBox}
+
+\begin{orangeBox}
+\textbf{Remote Branches tracken:}
+\\
+Erstellen eines neuen Branches, der einen Remote Branch trackt.
+\begin{lstlisting}[style=bash]
+$ git checkout -b [Branch-Name] [Remote Branch-Name]
+\end{lstlisting}
+Lokalen Branch einen Remote Branch tracken lassen. [Branch-Name] kann weg gelassen werden, falls der entsprechende Branch gerade ausgecheckt ist.
+\begin{lstlisting}[style=bash]
+$ git branch -u [Remote Branch-Name] [Branch-Name]
+\end{lstlisting}
+\end{orangeBox}
+
+\subsection{Nicht enthalten}
+\begin{itemize}
+\item Interactive Rebase
+\item Git Tags
+\end{itemize}
+
+\end{document}
